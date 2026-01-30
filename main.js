@@ -140,3 +140,26 @@ function loop(){
 }
 
 loop();
+let touchStart = null;
+canvas.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    touchStart = { x: t.clientX, y: t.clientY };
+});
+
+canvas.addEventListener('touchmove', e => {
+    if (!touchStart) return;
+    const t = e.touches[0];
+
+    const dx = t.clientX - touchStart.x;
+    const dy = t.clientY - touchStart.y;
+
+    const mag = Math.hypot(dx, dy) || 1;
+    orb.dx = (dx / mag) * ORB_SPEED;
+    orb.dy = (dy / mag) * ORB_SPEED;
+});
+
+canvas.addEventListener('touchend', () => {
+    orb.dx = 0;
+    orb.dy = 0;
+    touchStart = null;
+});
