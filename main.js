@@ -55,6 +55,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') { orb.dx =  ORB_SPEED; orb.dy = 0; }
 });
 
+// ---------- TOUCH INPUT ----------
 let touchStart = null;
 
 function getTouchPos(e) {
@@ -77,12 +78,11 @@ canvas.addEventListener('touchmove', e => {
   const mag = Math.hypot(dx, dy) || 1;
   orb.dx = (dx / mag) * ORB_SPEED;
   orb.dy = (dy / mag) * ORB_SPEED;
+  touchStart = pos; // prevents snapping
 });
 
 canvas.addEventListener('touchend', () => {
-  orb.dx = 0;
-  orb.dy = 0;
-  touchStart = null;
+  touchStart = null; // orb keeps its last velocity
 });
 
 // ---------- FUNCTIONS ----------
@@ -90,15 +90,18 @@ function distance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+// closes loop & expands camp
 function closeLoopIfReturnedToCamp() {
-  if (orb.trail.length > 10 && distance(orb, camp) <= CAMP_RADIUS) {
+  if (orb.trail.length > 10 && distance(orb, camp) <= camp.radius) {
     camp.territory.push([...orb.trail]);
     orb.trail = [];
+    camp.radius += 2; // grow the camp
   }
 }
 
+// collision checks
 function checkCollisions() {
-  // Self collision
+  // self collision
   for (let i = 0; i < orb.trail.length - 10; i++) {
     if (distance(orb, orb.trail[i]) < ORB_RADIUS) {
       orb.trail = [];
@@ -110,7 +113,8 @@ function checkCollisions() {
       break;
     }
   }
-  // NPC collision
+
+  // NPC collisions
   npcs.forEach(npc => {
     if (distance(orb, npc) < ORB_RADIUS * 2) {
       orb.energy = Math.max(0, orb.energy - 1);
@@ -118,6 +122,7 @@ function checkCollisions() {
   });
 }
 
+// NPC movement
 function moveNPCs() {
   npcs.forEach(npc => {
     npc.x += npc.dx;
@@ -131,6 +136,7 @@ function moveNPCs() {
   });
 }
 
+// save camp energy
 function saveEnergy() {
   localStorage.setItem('campEnergy', camp.energy);
 }
@@ -140,7 +146,7 @@ function update() {
   orb.x += orb.dx;
   orb.y += orb.dy;
 
-  if (distance(orb, camp) > CAMP_RADIUS) {
+  if (distance(orb, camp) > camp.radius) {
     orb.trail.push({ x: orb.x, y: orb.y });
     if (orb.trail.length > 200) orb.trail.shift();
   }
@@ -152,7 +158,7 @@ function update() {
     }
   });
 
-  if (distance(orb, camp) <= CAMP_RADIUS && orb.energy > 0) {
+  if (distance(orb, camp) <= camp.radius && orb.energy > 0) {
     camp.energy += orb.energy;
     orb.energy = 0;
     saveEnergy();
@@ -179,7 +185,7 @@ function draw() {
   // Camp
   ctx.fillStyle = 'gray';
   ctx.beginPath();
-  ctx.arc(camp.x, camp.y, CAMP_RADIUS, 0, Math.PI * 2);
+  ctx.arc(camp.x, camp.y, camp.radius, 0, Math.PI * 2);
   ctx.fill();
 
   // Nodes
@@ -221,7 +227,7 @@ function draw() {
 
   // HUD
   ctx.fillStyle = 'white';
-  ctx.font = '20px Arial'; // readable size
+  ctx.font = '20px Arial';
   ctx.fillText(`Orb Energy: ${orb.energy}`, 10, canvas.height - 30);
   ctx.fillText(`Camp Energy: ${camp.energy}`, canvas.width - 150, canvas.height - 30);
 }
