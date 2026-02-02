@@ -110,7 +110,7 @@ function checkCollisions() {
       break;
     }
   }
-  // NPC collision with orb
+  // NPC collision
   npcs.forEach(npc => {
     if (distance(orb, npc) < ORB_RADIUS * 2) {
       orb.energy = Math.max(0, orb.energy - 1);
@@ -221,8 +221,9 @@ function draw() {
 
   // HUD
   ctx.fillStyle = 'white';
-  ctx.fillText(`Orb Energy: ${orb.energy}`, 10, 20);
-  ctx.fillText(`Camp Energy: ${camp.energy}`, 10, 40);
+  ctx.font = '20px Arial'; // readable size
+  ctx.fillText(`Orb Energy: ${orb.energy}`, 10, canvas.height - 30);
+  ctx.fillText(`Camp Energy: ${camp.energy}`, canvas.width - 150, canvas.height - 30);
 }
 
 // ---------- LOOP ----------
