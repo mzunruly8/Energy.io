@@ -1,8 +1,7 @@
 // ===============================
-// ENERGY.IO — CLEAN FOUNDATION
+// ENERGY.IO — STABLE MOBILE BUILD
 // ===============================
 
-// ---------- SETUP ----------
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
@@ -17,7 +16,7 @@ const NODE_RADIUS = 5;
 const BASE_RADIUS_START = 40;
 const SPEED = 3;
 
-// ---------- GAME STATE ----------
+// ---------- STATE ----------
 const orb = {
   x: WORLD_WIDTH / 2,
   y: WORLD_HEIGHT / 2,
@@ -42,6 +41,10 @@ const nodes = Array.from({ length: 20 }, () => ({
 }));
 
 // ---------- INPUT ----------
+let touchActive = false;
+let touchTarget = null;
+
+// Keyboard
 document.addEventListener("keydown", e => {
   if (e.key === "ArrowUp")    { orb.dx = 0; orb.dy = -SPEED; }
   if (e.key === "ArrowDown")  { orb.dx = 0; orb.dy = SPEED; }
@@ -49,10 +52,29 @@ document.addEventListener("keydown", e => {
   if (e.key === "ArrowRight") { orb.dx = SPEED; orb.dy = 0; }
 });
 
+// Touch
+canvas.addEventListener("touchstart", e => {
+  e.preventDefault();
+  touchActive = true;
+  const t = e.touches[0];
+  touchTarget = { x: t.clientX, y: t.clientY };
+});
+
+canvas.addEventListener("touchmove", e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  touchTarget = { x: t.clientX, y: t.clientY };
+});
+
+canvas.addEventListener("touchend", () => {
+  touchActive = false;
+  touchTarget = null;
+});
+
 // ---------- HELPERS ----------
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
-function clampOrbToWorld() {
+function clamp() {
   orb.x = Math.max(ORB_RADIUS, Math.min(WORLD_WIDTH - ORB_RADIUS, orb.x));
   orb.y = Math.max(ORB_RADIUS, Math.min(WORLD_HEIGHT - ORB_RADIUS, orb.y));
 }
@@ -64,17 +86,28 @@ function saveEnergy() {
 // ---------- UPDATE ----------
 function update() {
 
-  // movement
-  orb.x += orb.dx;
-  orb.y += orb.dy;
-  clampOrbToWorld();
+  // Touch movement
+  if (touchActive && touchTarget) {
+    const dx = touchTarget.x - orb.x;
+    const dy = touchTarget.y - orb.y;
+    const mag = Math.hypot(dx, dy);
+    if (mag > 1) {
+      orb.x += (dx / mag) * SPEED;
+      orb.y += (dy / mag) * SPEED;
+    }
+  } else {
+    orb.x += orb.dx;
+    orb.y += orb.dy;
+  }
 
-  // leave trail only outside base
+  clamp();
+
+  // Trail outside base
   if (dist(orb, camp) > camp.radius) {
     orb.trail.push({ x: orb.x, y: orb.y });
   }
 
-  // collect nodes
+  // Collect nodes
   nodes.forEach(n => {
     if (!n.collected && dist(orb, n) < ORB_RADIUS + NODE_RADIUS) {
       n.collected = true;
@@ -82,21 +115,13 @@ function update() {
     }
   });
 
-  // close loop when returning to base
+  // Loop closure
   if (orb.trail.length > 15 && dist(orb, camp) <= camp.radius) {
-
-    // add territory
     camp.territory.push([...orb.trail]);
-
-    // expand base slightly
     camp.radius += 4;
-
-    // deposit energy
     camp.energy += orb.energy;
     orb.energy = 0;
     saveEnergy();
-
-    // clear trail
     orb.trail = [];
   }
 }
@@ -105,25 +130,19 @@ function update() {
 function draw() {
   ctx.clearRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-  // draw captured territory (solid fill)
   ctx.fillStyle = "rgba(0,200,200,0.2)";
   camp.territory.forEach(loop => {
     ctx.beginPath();
-    loop.forEach((p, i) => {
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
+    loop.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
     ctx.closePath();
     ctx.fill();
   });
 
-  // draw base
   ctx.fillStyle = "#555";
   ctx.beginPath();
   ctx.arc(camp.x, camp.y, camp.radius, 0, Math.PI * 2);
   ctx.fill();
 
-  // draw nodes
   nodes.forEach(n => {
     if (!n.collected) {
       ctx.fillStyle = "yellow";
@@ -133,23 +152,17 @@ function draw() {
     }
   });
 
-  // draw trail
   ctx.strokeStyle = "cyan";
   ctx.lineWidth = 3;
   ctx.beginPath();
-  orb.trail.forEach((p, i) => {
-    if (i === 0) ctx.moveTo(p.x, p.y);
-    else ctx.lineTo(p.x, p.y);
-  });
+  orb.trail.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
   ctx.stroke();
 
-  // draw orb
   ctx.fillStyle = "cyan";
   ctx.beginPath();
   ctx.arc(orb.x, orb.y, ORB_RADIUS, 0, Math.PI * 2);
   ctx.fill();
 
-  // HUD
   ctx.fillStyle = "#fff";
   ctx.font = "18px Arial";
   ctx.fillText(`Orb: ${orb.energy}`, 20, WORLD_HEIGHT - 30);
