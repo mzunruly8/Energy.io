@@ -9,3 +9,215 @@
     <script src="main.js"></script>
 </body>
 </html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>energy.io</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #0b0b0b;
+    }
+    canvas {
+      display: block;
+      background: #111;
+    }
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<script>
+/* =====================
+   CONFIG
+===================== */
+const TILE_SIZE = 16;
+const WORLD_WIDTH = 120;
+const WORLD_HEIGHT = 120;
+
+const PLAYER_SPEED = 0.12;
+
+/* =====================
+   CANVAS
+===================== */
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+/* =====================
+   WORLD STATE
+===================== */
+const world = Array.from({ length: WORLD_HEIGHT }, () =>
+  Array(WORLD_WIDTH).fill(0)
+);
+// 0 = neutral, 1 = owned
+
+/* =====================
+   PLAYER
+===================== */
+const player = {
+  x: Math.floor(WORLD_WIDTH / 2),
+  y: Math.floor(WORLD_HEIGHT / 2),
+  trail: [],
+  isOutside: false
+};
+
+// initial base tile
+world[player.y][player.x] = 1;
+
+/* =====================
+   INPUT
+===================== */
+const keys = {};
+window.addEventListener("keydown", e => keys[e.key] = true);
+window.addEventListener("keyup", e => keys[e.key] = false);
+
+/* =====================
+   FLOOD FILL (polygon capture)
+===================== */
+function floodFill(startX, startY) {
+  const stack = [[startX, startY]];
+  const visited = new Set();
+
+  while (stack.length) {
+    const [x, y] = stack.pop();
+    const key = `${x},${y}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    if (
+      x < 0 || y < 0 ||
+      x >= WORLD_WIDTH || y >= WORLD_HEIGHT
+    ) continue;
+
+    if (world[y][x] === 1) continue;
+
+    world[y][x] = 1;
+
+    stack.push([x + 1, y]);
+    stack.push([x - 1, y]);
+    stack.push([x, y + 1]);
+    stack.push([x, y - 1]);
+  }
+}
+
+/* =====================
+   LOOP CLOSURE
+===================== */
+function closeLoop() {
+  player.trail.forEach(([x, y]) => {
+    world[y][x] = 1;
+  });
+
+  // find a fill seed inside loop
+  const mid = player.trail[Math.floor(player.trail.length / 2)];
+  floodFill(mid[0], mid[1]);
+
+  player.trail.length = 0;
+  player.isOutside = false;
+}
+
+/* =====================
+   UPDATE
+===================== */
+function update(dt) {
+  let dx = 0, dy = 0;
+
+  if (keys["ArrowUp"]) dy -= PLAYER_SPEED * dt;
+  if (keys["ArrowDown"]) dy += PLAYER_SPEED * dt;
+  if (keys["ArrowLeft"]) dx -= PLAYER_SPEED * dt;
+  if (keys["ArrowRight"]) dx += PLAYER_SPEED * dt;
+
+  const nx = Math.round(player.x + dx);
+  const ny = Math.round(player.y + dy);
+
+  if (
+    nx < 0 || ny < 0 ||
+    nx >= WORLD_WIDTH || ny >= WORLD_HEIGHT
+  ) return;
+
+  player.x = nx;
+  player.y = ny;
+
+  if (world[ny][nx] === 0) {
+    player.isOutside = true;
+    if (!player.trail.some(p => p[0] === nx && p[1] === ny)) {
+      player.trail.push([nx, ny]);
+    }
+  } else if (player.isOutside) {
+    closeLoop();
+  }
+}
+
+/* =====================
+   RENDER
+===================== */
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const camX = player.x * TILE_SIZE - canvas.width / 2;
+  const camY = player.y * TILE_SIZE - canvas.height / 2;
+
+  for (let y = 0; y < WORLD_HEIGHT; y++) {
+    for (let x = 0; x < WORLD_WIDTH; x++) {
+      if (world[y][x] === 1) {
+        ctx.fillStyle = "#2aff7b";
+        ctx.fillRect(
+          x * TILE_SIZE - camX,
+          y * TILE_SIZE - camY,
+          TILE_SIZE,
+          TILE_SIZE
+        );
+      }
+    }
+  }
+
+  // trail
+  ctx.fillStyle = "#44aaff";
+  player.trail.forEach(([x, y]) => {
+    ctx.fillRect(
+      x * TILE_SIZE - camX,
+      y * TILE_SIZE - camY,
+      TILE_SIZE,
+      TILE_SIZE
+    );
+  });
+
+  // player
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(
+    player.x * TILE_SIZE - camX + TILE_SIZE / 2,
+    player.y * TILE_SIZE - camY + TILE_SIZE / 2,
+    TILE_SIZE / 2.5,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+}
+
+/* =====================
+   GAME LOOP
+===================== */
+let last = performance.now();
+function loop(now) {
+  const dt = now - last;
+  last = now;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+loop(last);
+</script>
+</body>
+</html>
